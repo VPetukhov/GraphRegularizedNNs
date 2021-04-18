@@ -1,8 +1,11 @@
-from sklearn import neighbors
+from sklearn import neighbors, cluster
 from sklearn.metrics import pairwise
+from sklearn.manifold import SpectralEmbedding
+
 from scipy.spatial.distance import pdist, squareform
 import pygsp
 import torch
+import numpy as np
 
 
 def create_graph_from_embedding(embedding, name, k=10, n_clusters=8):
@@ -19,7 +22,7 @@ def create_graph_from_embedding(embedding, name, k=10, n_clusters=8):
         mat = neighbors.kneighbors_graph(embedding, n_neighbors=k, metric='cosine', mode='distance')
         mat.data = 1 - mat.data
         A = mat.toarray()
-        A = (A + A.T) / 2 # Symmetrize knn graph
+        A = (A + A.T) / 2
         return A
     elif name == 'knn-flat':
         A = neighbors.kneighbors_graph(embedding, n_neighbors=k, metric='cosine').toarray()
@@ -50,6 +53,18 @@ def create_graph_from_embedding(embedding, name, k=10, n_clusters=8):
 
         np.fill_diagonal(A, 0)
         return A
+    elif 'knn-spectral':
+        mat = neighbors.kneighbors_graph(embedding, n_neighbors=k, metric='cosine', mode='distance')
+        mat.data = 1 - mat.data
+        A = mat.toarray()
+        A = (A + A.T) / 2
+        clusts = cluster.SpectralClustering(n_clusters=n_clusters, affinity='precomputed').fit(A).labels_
+
+        mask = np.zeros(A.shape)
+        for i in range(clusts.max() + 1):
+            mask[np.ix_(clusts == i, clusts == i)] = 1.0
+
+        return (A > 1e-5) * mask
     else:
         raise RuntimeError('Unknown graph name %s' % name)
 
