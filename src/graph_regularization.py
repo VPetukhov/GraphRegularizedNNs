@@ -78,3 +78,41 @@ def create_lap_from_embedding(embedding, *args, **kwargs):
 
 def graph_loss(activations, lap):
     return (activations.mm(lap) * activations).sum() / activations.shape[1]
+
+
+def create_graph_from_layered_embedding(embs, frac:float = 0.1, n_clusters:int = 0):
+    n_hidden = len(embs)
+    layers = [e.shape[0] for e in embs]
+    
+    neighs = [neighbors.NearestNeighbors(n_neighbors=int(frac * layers[i] + 1), metric='cosine').fit(embs[i]) for i in range(n_hidden)]
+    ids_per_layer = [sum(layers[:i]) + np.arange(layers[i], dtype=int) for i in range(n_hidden)]
+    
+    adj_mat = np.zeros((sum(layers), sum(layers)))
+
+    for i in range(n_hidden):
+        dist, ids = [x[:, 1:] for x in neighs[i].kneighbors(embs[i], return_distance=True)]
+        for v1,v2s in enumerate(ids):
+            adj_mat[ids_per_layer[i][v1], ids_per_layer[i][v2s]] = 1 - dist[v1,:]
+
+        if i != n_hidden - 1:
+            dist, ids = [x[:, :-1] for x in neighs[i + 1].kneighbors(embs[i], return_distance=True)]
+            for v1,v2s in enumerate(ids):
+                adj_mat[ids_per_layer[i][v1], ids_per_layer[i + 1][v2s]] = 1 - dist[v1,:]
+
+        if i != 0:
+            dist, ids = [x[:, :-1] for x in neighs[i - 1].kneighbors(embs[i], return_distance=True)]
+            for v1,v2s in enumerate(ids):
+                adj_mat[ids_per_layer[i][v1], ids_per_layer[i - 1][v2s]] = 1 - dist[v1,:]
+
+    adj_mat = (adj_mat + adj_mat.T) / 2
+    
+    if n_clusters <= 0:
+        return adj_mat
+
+    clusts = cluster.SpectralClustering(n_clusters=n_clusters, affinity='precomputed').fit(adj_mat).labels_
+
+    mask = np.zeros_like(adj_mat)
+    for i in range(clusts.max() + 1):
+        mask[np.ix_(clusts == i, clusts == i)] = 1.0
+
+    return (adj_mat > 1e-5) * mask
