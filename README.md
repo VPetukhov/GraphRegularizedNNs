@@ -1,6 +1,6 @@
 # Graph-regularized Neural Networks
 
-The repo contains application of my extention of the method from [Interpretable Neuron Structuring with GraphSpectral Regularization by Tong, et. al](https://arxiv.org/pdf/1810.00424.pdf)
+The repo contains application of my extention of the method from [Interpretable Neuron Structuring with Graph Spectral Regularization by Tong, et. al](https://arxiv.org/pdf/1810.00424.pdf)
 to a few other types of networks (more realistic in my opinion).
 
 The main results are:
